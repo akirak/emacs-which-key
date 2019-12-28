@@ -1782,11 +1782,13 @@ Requires `which-key-compute-remaps' to be non-nil"
 
 (defun which-key--get-current-bindings (&optional prefix)
   "Generate a list of current active bindings."
-  (let ((ignore-bindings '(self-insert-command
-                           ignore
-                           ignore-event
-                           company-ignore))
-        (active-maps (with-current-buffer (current-buffer) (current-active-maps))))
+  (let* ((ignore-bindings '(self-insert-command
+                            ignore
+                            ignore-event
+                            company-ignore))
+         (buffer (current-buffer))
+         (active-maps (with-current-buffer buffer
+                        (current-active-maps))))
     (cl-loop for entry in (cl-remove-duplicates
                            (thread-last
                                (if prefix
@@ -1795,10 +1797,12 @@ Requires `which-key-compute-remaps' to be non-nil"
                                  active-maps)
                              (cl-remove-if-not #'keymapp)
                              (mapcar (lambda (map)
-                                       (cl-typecase map
+                                       (when (eq map 'mode-specific-command-prefix)
+                                         (setq map (buffer-local-value 'mode-specific-map
+                                                                       buffer)))
+                                       (cl-etypecase map
                                          (list (cdr map))
-                                         (symbol (cdr (when (boundp map)
-                                                        (symbol-value map)))))))
+                                         (symbol (symbol-value map)))))
                              (apply #'append))
                            :from-end t
                            :key #'car
