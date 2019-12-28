@@ -1782,74 +1782,51 @@ Requires `which-key-compute-remaps' to be non-nil"
 
 (defun which-key--get-current-bindings (&optional prefix)
   "Generate a list of current active bindings."
-  (let ((key-str-qt (regexp-quote (key-description prefix)))
-        (buffer (current-buffer))
-        (ignore-bindings '("self-insert-command" "ignore"
-                           "ignore-event" "company-ignore"))
-        (ignore-sections-regexp
-         (eval-when-compile
-           (regexp-opt '("Key translations" "Function key map translations"
-                         "Input decoding map translations")))))
-    (with-temp-buffer
-      (setq-local indent-tabs-mode t)
-      (setq-local tab-width 8)
-      (describe-buffer-bindings buffer prefix)
-      (goto-char (point-min))
-      (let ((header-p (not (= (char-after) ?\f)))
-            bindings header)
-        (while (not (eobp))
-          (cond
-           (header-p
-            (setq header (buffer-substring-no-properties
-                          (point)
-                          (line-end-position)))
-            (setq header-p nil)
-            (forward-line 3))
-           ((= (char-after) ?\f)
-            (setq header-p t))
-           ((looking-at "^[ \t]*$"))
-           ((or (not (string-match-p ignore-sections-regexp header)) prefix)
-            (let ((binding-start (save-excursion
-                                   (and (re-search-forward "\t+" nil t)
-                                        (match-end 0))))
-                  key binding)
-              (when binding-start
-                (setq key (buffer-substring-no-properties
-                           (point) binding-start))
-                (setq binding (buffer-substring-no-properties
-                               binding-start
-                               (line-end-position)))
-                (save-match-data
-                  (cond
-                   ((member binding ignore-bindings))
-                   ((string-match-p which-key--ignore-keys-regexp key))
-                   ((and prefix
-                         (string-match (format "^%s[ \t]\\([^ \t]+\\)[ \t]+$"
-                                               key-str-qt) key))
-                    (unless (assoc-string (match-string 1 key) bindings)
-                      (push (cons (match-string 1 key)
-                                  (which-key--compute-binding binding))
-                            bindings)))
-                   ((and prefix
-                         (string-match
-                          (format
-                           "^%s[ \t]\\([^ \t]+\\) \\.\\. %s[ \t]\\([^ \t]+\\)[ \t]+$"
-                           key-str-qt key-str-qt) key))
-                    (let ((stripped-key (concat (match-string 1 key)
-                                                " \.\. "
-                                                (match-string 2 key))))
-                      (unless (assoc-string stripped-key bindings)
-                        (push (cons stripped-key
-                                    (which-key--compute-binding binding))
-                              bindings))))
-                   ((string-match
-                     "^\\([^ \t]+\\|[^ \t]+ \\.\\. [^ \t]+\\)[ \t]+$" key)
-                    (unless (assoc-string (match-string 1 key) bindings)
-                      (push (cons (match-string 1 key)
-                                  (which-key--compute-binding binding))
-                            bindings)))))))))
-          (forward-line))
-        (nreverse bindings)))))
+  (let ((ignore-bindings '(self-insert-command
+                           ignore
+                           ignore-event
+                           company-ignore))
+        (active-maps (with-current-buffer (current-buffer) (current-active-maps))))
+    (cl-loop for entry in (cl-remove-duplicates
+                           (thread-last
+                               (if prefix
+                                   (mapcar (lambda (map) (lookup-key map prefix))
+                                           active-maps)
+                                 active-maps)
+                             (cl-remove-if-not #'keymapp)
+                             (mapcar (lambda (map)
+                                       (cl-typecase map
+                                         (list (cdr map))
+                                         (symbol (cdr (when (boundp map)
+                                                        (symbol-value map)))))))
+                             (apply #'append))
+                           :from-end t
+                           :key #'car
+                           :test #'eql)
+             with bindings = nil
+             do (pcase entry
+                  (`(,key menu-item . ,details)
+                   (push (cons (key-description (cl-etypecase key
+                                                  (number (vector key))
+                                                  (vector key)))
+                               (or (car-safe details)
+                                   "menu-item"))
+                         bindings))
+                  ((and `(,key . ,def)
+                        (guard (not (memq def ignore-bindings))))
+                   (push (cons (key-description (cl-etypecase key
+                                                  (vector key)
+                                                  (otherwise (vector key))))
+                               (cond
+                                ((keymapp def) "Prefix Command")
+                                ((symbolp def) (copy-sequence (symbol-name def)))
+                                ((eq 'lambda (car-safe def)) "lambda")
+                                ((eq 'menu-item (car-safe def)) "menu-item")
+                                ((stringp def) def)
+                                ((vectorp def) (key-description def))
+                                (t "unknown")))
+                         bindings)))
+             finally return bindings)))
 
 (defun which-key--get-bindings (&optional prefix keymap filter recursive)
   "Collect key bindings.
