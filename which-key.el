@@ -1805,7 +1805,8 @@ Requires `which-key-compute-remaps' to be non-nil"
                                          (symbol (symbol-value map)))))
                              (apply #'append))
                            :from-end t
-                           :key #'car
+                           ;; Prevent an error (wrong-type-argument listp keymap)
+                           :key #'car-safe
                            :test #'eql)
              with bindings = nil
              do (pcase entry
