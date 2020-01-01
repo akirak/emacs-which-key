@@ -1797,9 +1797,12 @@ Requires `which-key-compute-remaps' to be non-nil"
                                  active-maps)
                              (cl-remove-if-not #'keymapp)
                              (mapcar (lambda (map)
-                                       (when (eq map 'mode-specific-command-prefix)
-                                         (setq map (buffer-local-value 'mode-specific-map
-                                                                       buffer)))
+                                       (cl-case map
+                                         (mode-specific-command-prefix
+                                          (setq map (buffer-local-value 'mode-specific-map
+                                                                        buffer)))
+                                         (help-command
+                                          (setq map help-map)))
                                        (cl-etypecase map
                                          (list (cdr map))
                                          (symbol (symbol-value map)))))
