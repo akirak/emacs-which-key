@@ -1803,6 +1803,7 @@ Requires `which-key-compute-remaps' to be non-nil"
                                                                         buffer)))
                                          (help-command
                                           (setq map help-map))
+                                         ;; TODO: Show all bindings under c-x
                                          (Control-X-prefix
                                           (setq map ctl-x-map))
                                          (ctl-x-r-prefix
