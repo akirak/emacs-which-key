@@ -1802,7 +1802,15 @@ Requires `which-key-compute-remaps' to be non-nil"
                                           (setq map (buffer-local-value 'mode-specific-map
                                                                         buffer)))
                                          (help-command
-                                          (setq map help-map)))
+                                          (setq map help-map))
+                                         (Control-X-prefix
+                                          (setq map ctl-x-map))
+                                         (ctl-x-r-prefix
+                                          (setq map ctl-x-r-map))
+                                         (ctl-x-4-prefix
+                                          (setq map ctl-x-4-map))
+                                         (ctl-x-5-prefix
+                                          (setq map ctl-x-5-map)))
                                        (cl-etypecase map
                                          (list (cdr map))
                                          (symbol (symbol-value map)))))
